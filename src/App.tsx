@@ -2,7 +2,7 @@ import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@mui/material";
 
-import { config } from "./config";
+import { config } from "./wagmi";
 
 import { QuizGameComponent } from "./features/QuizGame/QuizGame";
 import { MetamaskPanelComponent } from "./features/MetamaskPanel/MetamaskPanel";

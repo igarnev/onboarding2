@@ -1,6 +1,6 @@
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useAccount } from "wagmi";
-import { readContract, writeContract } from "@wagmi/core";
+import { readContract, writeContract, watchContractEvent } from "@wagmi/core";
 import { Button, TextField } from "@mui/material";
 
 import { config } from "../../config";
@@ -12,8 +12,15 @@ import { QuizBasicInfo } from "../../models/Quiz";
 import { ContractAddress } from "../../models/ContractAddress";
 
 import "./QuizGame.scss";
+import InfoModal from "../../components/Modal/InfoModal";
+import { parseGwei } from "viem";
 
-const FACTORY_CONTRACT_ADDRESS = "0x4B67330d175E2De9319A6b65DF20a8Ddb1e8b8F3";
+const FACTORY_CONTRACT_ADDRESS = "0x3132b5E0B22c52474fE6b5505195c2085Db257F6";
+
+interface WinnerProps {
+  answer: string;
+  winnerAddress: ContractAddress;
+}
 
 export const QuizGameComponent = () => {
   const { address } = useAccount();
@@ -22,10 +29,18 @@ export const QuizGameComponent = () => {
   const [activeQuiz, setActiveQuiz] = useState<QuizBasicInfo>();
   const [answer, setAnswer] = useState("");
   const [betAmount, setBetAmount] = useState(0);
+  const [winner, setWinner] = useState<WinnerProps>();
+  const [isCreatingQuizQuestion, setIsCreatingQuizQuestion] =
+    useState<boolean>(false);
+  const [question, setQuestion] = useState("");
+  const [questionAnswer, setQuestionAnswer] = useState("");
+  const [questionSalt, setQuestionSalt] = useState("");
 
   useEffect(() => {
-    fetchAllQuizzes();
-  }, []);
+    if (address) {
+      fetchAllQuizzes();
+    }
+  }, [address]);
 
   const fetchAllQuizzes = async () => {
     try {
@@ -71,14 +86,23 @@ export const QuizGameComponent = () => {
     }
   };
 
-  const writeData = async () => {
+  const addQuizQuestion = async () => {
     try {
       const result = await writeContract(config, {
         abi: QUIZ_GAME_FACTORY_ABI,
         address: FACTORY_CONTRACT_ADDRESS,
         functionName: "createQuizGame",
-        args: ["Kolko e 2 + 2?", "4", "Salty sea sure"],
-        value: BigInt(600000),
+        args: [question, questionAnswer, questionSalt],
+        value: BigInt(6),
+      });
+
+      watchContractEvent(config, {
+        address: FACTORY_CONTRACT_ADDRESS,
+        abi: QUIZ_GAME_FACTORY_ABI,
+        eventName: "QuizGameCreated",
+        onLogs(logs: any) {
+          fetchAllQuizzes();
+        },
       });
 
       console.log(result);
@@ -92,29 +116,34 @@ export const QuizGameComponent = () => {
     guessedAnswer: string
   ) => {
     try {
+      watchContractEvent(config, {
+        address: quizAddress,
+        abi: QUIZ_GAME_ABI,
+        eventName: "AnswerGuessedCorrectly",
+        onLogs(logs: any) {
+          setWinner(logs.args);
+
+          fetchAllQuizzes();
+        },
+      });
+
+      // It must be correct answer here
       const result = await writeContract(config, {
         abi: QUIZ_GAME_ABI,
-        address: "0x55f77CbFC5694262cD09d1FB0CEd81B9B5e5F7db",
+        address: quizAddress,
         functionName: "guessAnswer",
-        args: ["4"],
-        value: BigInt(555),
+        args: ["5"],
+        gas: parseGwei("20"),
+        maxFeePerGas: parseGwei("21"),
       });
 
       console.log(result);
-    } catch (error) {
-      console.log(error);
+    } catch (error: any) {
+      console.error(error);
     }
   };
 
-  const handleAnswerChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setAnswer(event.target.value);
-  };
-
-  const handleBetAmountChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setBetAmount(+event.target.value);
-  };
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmitAnswer = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (activeQuiz?.address) {
@@ -122,22 +151,44 @@ export const QuizGameComponent = () => {
     }
   };
 
+  const handleCreateQuizQuestion = async (
+    event: FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+    await addQuizQuestion();
+  };
+
   return (
     <div className="quiz-game-container">
       <div className="quizzes-container">
+        <Button
+          variant="contained"
+          onClick={() => {
+            setActiveQuiz(undefined);
+            setIsCreatingQuizQuestion(true);
+          }}
+          sx={{ width: "20rem" }}
+        >
+          Create a quiz question
+        </Button>
+
         {quizzes.map((quiz, index) => (
           <Button
             key={index}
             variant="contained"
-            onClick={() => setActiveQuiz(quiz)}
+            onClick={() => {
+              setIsCreatingQuizQuestion(false);
+              setActiveQuiz(quiz);
+            }}
             sx={{ width: "20rem" }}
           >
             Start the "{quiz.question}" Quizz
           </Button>
         ))}
       </div>
+
       {activeQuiz && (
-        <form onSubmit={handleSubmit} className="game-container">
+        <form onSubmit={handleSubmitAnswer} className="game-container">
           <div>{activeQuiz.question}</div>
 
           <TextField
@@ -145,7 +196,7 @@ export const QuizGameComponent = () => {
             label="Answer here"
             variant="outlined"
             value={answer}
-            onChange={handleAnswerChange}
+            onChange={(event) => setAnswer(event.target.value)}
             sx={{ width: "15rem" }}
           />
           <TextField
@@ -154,7 +205,7 @@ export const QuizGameComponent = () => {
             type="number"
             variant="outlined"
             value={betAmount}
-            onChange={handleBetAmountChange}
+            onChange={(event) => setBetAmount(+event.target.value)}
             sx={{ width: "15rem" }}
           />
           <Button type="submit" variant="contained" sx={{ width: "10rem" }}>
@@ -162,6 +213,48 @@ export const QuizGameComponent = () => {
           </Button>
         </form>
       )}
+
+      {isCreatingQuizQuestion && (
+        <form onSubmit={handleCreateQuizQuestion} className="game-container">
+          <div>Quiz Question Form</div>
+
+          <TextField
+            id="question"
+            label="Add your question"
+            variant="outlined"
+            value={question}
+            onChange={(event) => setQuestion(event.target.value)}
+            sx={{ width: "15rem" }}
+          />
+          <TextField
+            id="questionAnswer"
+            label="Add your question sanswer"
+            variant="outlined"
+            value={questionAnswer}
+            onChange={(event) => setQuestionAnswer(event.target.value)}
+            sx={{ width: "15rem" }}
+          />
+
+          <TextField
+            id="salt"
+            label="Add your secret salt"
+            variant="outlined"
+            value={questionSalt}
+            onChange={(event) => setQuestionSalt(event.target.value)}
+            sx={{ width: "15rem" }}
+          />
+
+          <Button type="submit" variant="contained" sx={{ width: "10rem" }}>
+            Enter
+          </Button>
+        </form>
+      )}
+
+      <InfoModal
+        isOpen={!!winner?.winnerAddress}
+        headerText="You guessed the right answer! And it was:"
+        contentText={winner?.answer || ""}
+      ></InfoModal>
     </div>
   );
 };

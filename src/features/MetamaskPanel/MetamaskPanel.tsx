@@ -1,4 +1,4 @@
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { useAccount, useConnect, useDisconnect, useEnsName } from "wagmi";
 
 import IconButton from "@mui/material/IconButton";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -14,7 +14,7 @@ import "./MetamaskPanel.scss";
 export const MetamaskPanelComponent = () => {
   const account = useAccount();
 
-  const { connectors, connect, error } = useConnect();
+  const { connectors, error, connect } = useConnect();
   const { disconnect } = useDisconnect();
 
   return (
