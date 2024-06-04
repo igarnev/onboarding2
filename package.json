@@ -29,8 +29,10 @@
     "@vitejs/plugin-react": "^4.1.0",
     "@wagmi/cli": "latest",
     "buffer": "^6.0.3",
+    "dotenv": "^16.4.5",
     "sass": "^1.77.3",
     "typescript": "^5.2.2",
-    "vite": "^4.4.9"
+    "vite": "^4.4.9",
+    "vite-plugin-env-compatible": "^2.0.1"
   }
 }

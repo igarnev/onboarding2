@@ -13,7 +13,7 @@ import "./App.scss";
 
 const queryClient = new QueryClient();
 
-function App() {
+export const App = () => {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
@@ -26,6 +26,6 @@ function App() {
       </QueryClientProvider>
     </WagmiProvider>
   );
-}
+};
 
 export default App;

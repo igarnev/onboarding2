@@ -35,6 +35,12 @@ export const QUIZ_GAME_ABI = [
         name: "answer",
         type: "string",
       },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "winnedPrize",
+        type: "uint256",
+      },
     ],
     name: "AnswerGuessedCorrectly",
     type: "event",
@@ -42,6 +48,19 @@ export const QUIZ_GAME_ABI = [
   {
     stateMutability: "payable",
     type: "fallback",
+  },
+  {
+    inputs: [],
+    name: "factory",
+    outputs: [
+      {
+        internalType: "address",
+        name: "",
+        type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
   },
   {
     inputs: [],
@@ -66,20 +85,7 @@ export const QUIZ_GAME_ABI = [
     ],
     name: "guessAnswer",
     outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "owner",
-    outputs: [
-      {
-        internalType: "address payable",
-        name: "",
-        type: "address",
-      },
-    ],
-    stateMutability: "view",
+    stateMutability: "payable",
     type: "function",
   },
   {

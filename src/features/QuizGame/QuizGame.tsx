@@ -1,7 +1,7 @@
-import { FormEvent, useEffect, useState } from "react";
-import { useAccount } from "wagmi";
-import { readContract, writeContract, watchContractEvent } from "@wagmi/core";
-import { Button, TextField } from "@mui/material";
+import { useEffect, useState } from "react";
+import { readContract } from "@wagmi/core";
+import { Connector, useAccount, useConnect } from "wagmi";
+import { Button } from "@mui/material";
 
 import { config } from "../../config";
 
@@ -10,43 +10,45 @@ import { QUIZ_GAME_ABI } from "../../utils/abi/QuizGame";
 
 import { QuizBasicInfo } from "../../models/Quiz";
 import { ContractAddress } from "../../models/ContractAddress";
+import { ModalProps } from "../../models/Modal";
+
+import InfoModal from "../../components/Modal/InfoModal";
+import { CircularProgressComponent } from "../../components/CircularProgress/CircularProgress";
+import { AnswerQuizQuestion } from "../../components/AnswerQuizQuestion/AnswerQuizQuestion";
+import { CreateQuizQuestion } from "../../components/CreateQuizQuestion/CreateQuizQuestion";
 
 import "./QuizGame.scss";
-import InfoModal from "../../components/Modal/InfoModal";
-import { parseGwei } from "viem";
-
-const FACTORY_CONTRACT_ADDRESS = "0x3132b5E0B22c52474fE6b5505195c2085Db257F6";
-
-interface WinnerProps {
-  answer: string;
-  winnerAddress: ContractAddress;
-}
 
 export const QuizGameComponent = () => {
   const { address } = useAccount();
+  const { connectors } = useConnect();
 
+  const [connector, setConnector] = useState<Connector>();
   const [quizzes, setQuizzes] = useState<QuizBasicInfo[]>([]);
   const [activeQuiz, setActiveQuiz] = useState<QuizBasicInfo>();
-  const [answer, setAnswer] = useState("");
-  const [betAmount, setBetAmount] = useState(0);
-  const [winner, setWinner] = useState<WinnerProps>();
   const [isCreatingQuizQuestion, setIsCreatingQuizQuestion] =
     useState<boolean>(false);
-  const [question, setQuestion] = useState("");
-  const [questionAnswer, setQuestionAnswer] = useState("");
-  const [questionSalt, setQuestionSalt] = useState("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [modalProps, setModalProps] = useState<ModalProps>({
+    headerText: "",
+    contentText: "",
+  });
 
   useEffect(() => {
     if (address) {
       fetchAllQuizzes();
     }
+
+    setConnector(
+      connectors.filter((connector) => connector.id === "io.metamask")[0]
+    );
   }, [address]);
 
   const fetchAllQuizzes = async () => {
     try {
       const result = (await readContract(config, {
         abi: QUIZ_GAME_FACTORY_ABI,
-        address: FACTORY_CONTRACT_ADDRESS,
+        address: import.meta.env.FACTORY_CONTRACT_ADDRESS,
         functionName: "getQuizGames",
       })) as ContractAddress[];
 
@@ -59,14 +61,11 @@ export const QuizGameComponent = () => {
 
         const quizInfo: QuizBasicInfo = { question, address: quizAddress };
 
-        console.log(quizzes);
-
         fetchedQuizzes.push(quizInfo);
       }
 
       setQuizzes(fetchedQuizzes);
-
-      console.log(quizzes);
+      setIsLoading(false);
     } catch (error) {
       console.error("Error reading contract:", error);
     }
@@ -81,85 +80,19 @@ export const QuizGameComponent = () => {
       });
 
       return result;
-    } catch (error) {
-      console.error("Error reading contract:", error);
-    }
-  };
-
-  const addQuizQuestion = async () => {
-    try {
-      const result = await writeContract(config, {
-        abi: QUIZ_GAME_FACTORY_ABI,
-        address: FACTORY_CONTRACT_ADDRESS,
-        functionName: "createQuizGame",
-        args: [question, questionAnswer, questionSalt],
-        value: BigInt(6),
-      });
-
-      watchContractEvent(config, {
-        address: FACTORY_CONTRACT_ADDRESS,
-        abi: QUIZ_GAME_FACTORY_ABI,
-        eventName: "QuizGameCreated",
-        onLogs(logs: any) {
-          fetchAllQuizzes();
-        },
-      });
-
-      console.log(result);
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  const guessAnswer = async (
-    quizAddress: ContractAddress,
-    guessedAnswer: string
-  ) => {
-    try {
-      watchContractEvent(config, {
-        address: quizAddress,
-        abi: QUIZ_GAME_ABI,
-        eventName: "AnswerGuessedCorrectly",
-        onLogs(logs: any) {
-          setWinner(logs.args);
-
-          fetchAllQuizzes();
-        },
-      });
-
-      // It must be correct answer here
-      const result = await writeContract(config, {
-        abi: QUIZ_GAME_ABI,
-        address: quizAddress,
-        functionName: "guessAnswer",
-        args: ["5"],
-        gas: parseGwei("20"),
-        maxFeePerGas: parseGwei("21"),
-      });
-
-      console.log(result);
     } catch (error: any) {
-      console.error(error);
+      setModalProps({
+        headerText: "An error has occurred",
+        contentText: error.message,
+      });
+      setIsLoading(false);
     }
-  };
-
-  const handleSubmitAnswer = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (activeQuiz?.address) {
-      await guessAnswer(activeQuiz.address, answer);
-    }
-  };
-
-  const handleCreateQuizQuestion = async (
-    event: FormEvent<HTMLFormElement>
-  ) => {
-    event.preventDefault();
-    await addQuizQuestion();
   };
 
   return (
     <div className="quiz-game-container">
+      {isLoading && <CircularProgressComponent />}
+
       <div className="quizzes-container">
         <Button
           variant="contained"
@@ -168,92 +101,58 @@ export const QuizGameComponent = () => {
             setIsCreatingQuizQuestion(true);
           }}
           sx={{ width: "20rem" }}
+          disabled={!address}
         >
           Create a quiz question
         </Button>
 
-        {quizzes.map((quiz, index) => (
-          <Button
-            key={index}
-            variant="contained"
-            onClick={() => {
-              setIsCreatingQuizQuestion(false);
-              setActiveQuiz(quiz);
-            }}
-            sx={{ width: "20rem" }}
-          >
-            Start the "{quiz.question}" Quizz
-          </Button>
-        ))}
+        <div>
+          <div className="available-quizzes">Available quizzes: </div>
+
+          <div className="start-quizzes-buttons">
+            {quizzes.length ? (
+              quizzes.map((quiz, index) => (
+                <Button
+                  key={index}
+                  variant="contained"
+                  onClick={() => {
+                    setIsCreatingQuizQuestion(false);
+                    setActiveQuiz(quiz);
+                  }}
+                  sx={{ width: "20rem" }}
+                >
+                  Start the "{quiz.question}" Quizz
+                </Button>
+              ))
+            ) : (
+              <div>No quizzes available!</div>
+            )}
+          </div>
+        </div>
       </div>
 
-      {activeQuiz && (
-        <form onSubmit={handleSubmitAnswer} className="game-container">
-          <div>{activeQuiz.question}</div>
-
-          <TextField
-            id="answer"
-            label="Answer here"
-            variant="outlined"
-            value={answer}
-            onChange={(event) => setAnswer(event.target.value)}
-            sx={{ width: "15rem" }}
-          />
-          <TextField
-            id="betAmount"
-            label="$WEI to bet"
-            type="number"
-            variant="outlined"
-            value={betAmount}
-            onChange={(event) => setBetAmount(+event.target.value)}
-            sx={{ width: "15rem" }}
-          />
-          <Button type="submit" variant="contained" sx={{ width: "10rem" }}>
-            Enter
-          </Button>
-        </form>
+      {activeQuiz && connector && (
+        <AnswerQuizQuestion
+          activeQuiz={activeQuiz}
+          connector={connector}
+          setIsLoading={setIsLoading}
+          setModalProps={setModalProps}
+          fetchAllQuizzes={fetchAllQuizzes}
+        />
       )}
 
-      {isCreatingQuizQuestion && (
-        <form onSubmit={handleCreateQuizQuestion} className="game-container">
-          <div>Quiz Question Form</div>
-
-          <TextField
-            id="question"
-            label="Add your question"
-            variant="outlined"
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-            sx={{ width: "15rem" }}
-          />
-          <TextField
-            id="questionAnswer"
-            label="Add your question sanswer"
-            variant="outlined"
-            value={questionAnswer}
-            onChange={(event) => setQuestionAnswer(event.target.value)}
-            sx={{ width: "15rem" }}
-          />
-
-          <TextField
-            id="salt"
-            label="Add your secret salt"
-            variant="outlined"
-            value={questionSalt}
-            onChange={(event) => setQuestionSalt(event.target.value)}
-            sx={{ width: "15rem" }}
-          />
-
-          <Button type="submit" variant="contained" sx={{ width: "10rem" }}>
-            Enter
-          </Button>
-        </form>
+      {isCreatingQuizQuestion && connector && (
+        <CreateQuizQuestion
+          connector={connector}
+          setIsLoading={setIsLoading}
+          setModalProps={setModalProps}
+          fetchAllQuizzes={fetchAllQuizzes}
+        />
       )}
 
       <InfoModal
-        isOpen={!!winner?.winnerAddress}
-        headerText="You guessed the right answer! And it was:"
-        contentText={winner?.answer || ""}
+        modalProps={modalProps}
+        setModalProps={setModalProps}
       ></InfoModal>
     </div>
   );

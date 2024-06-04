@@ -79,4 +79,36 @@ export const QUIZ_GAME_FACTORY_ABI = [
     stateMutability: "view",
     type: "function",
   },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "quizGameAddress",
+        type: "address",
+      },
+    ],
+    name: "removeQuizGame",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "quizGameAddress",
+        type: "address",
+      },
+    ],
+    name: "testFindQuizGameIndex",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
 ];

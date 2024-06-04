@@ -12,7 +12,7 @@ export const config = createConfig({
   connectors: [
     injected(),
     coinbaseWallet({ appName: "Create Wagmi" }),
-    walletConnect({ projectId: import.meta.env.VITE_WC_PROJECT_ID }),
+    walletConnect({ projectId: "bec9910961cd780e32a9a7c5e8030bd1" }),
     metaMask(),
   ],
   transports: {

@@ -1,13 +1,15 @@
-import { useAccount, useConnect, useDisconnect, useEnsName } from "wagmi";
+import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { useEffect, useState } from "react";
 
 import IconButton from "@mui/material/IconButton";
 import LogoutIcon from "@mui/icons-material/Logout";
 
-import metamaskLogo from "../../assets/metamask-logo.png";
-
 import { MainTooltip } from "../../components/Tooltips/MainTooltip";
-
 import InfoModal from "../../components/Modal/InfoModal";
+
+import { ModalProps } from "../../models/Modal";
+
+import metamaskLogo from "../../assets/metamask-logo.png";
 
 import "./MetamaskPanel.scss";
 
@@ -15,7 +17,20 @@ export const MetamaskPanelComponent = () => {
   const account = useAccount();
 
   const { connectors, error, connect } = useConnect();
+  const [modalProps, setModalProps] = useState<ModalProps>({
+    headerText: "",
+    contentText: "",
+  });
   const { disconnect } = useDisconnect();
+
+  useEffect(() => {
+    if (error) {
+      setModalProps({
+        headerText: "An error has occurred",
+        contentText: error?.message,
+      });
+    }
+  }, [error]);
 
   return (
     <div className="metamask-panel-container">
@@ -72,11 +87,12 @@ export const MetamaskPanelComponent = () => {
         </div>
       </div>
 
-      <InfoModal
-        isOpen={!!error?.message}
-        headerText="Connecting error has occurred!"
-        contentText={error?.message || ""}
-      ></InfoModal>
+      {modalProps.headerText && (
+        <InfoModal
+          modalProps={modalProps}
+          setModalProps={setModalProps}
+        ></InfoModal>
+      )}
     </div>
   );
 };
