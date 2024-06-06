@@ -20,7 +20,7 @@ import { CreateQuizQuestion } from "../../components/CreateQuizQuestion/CreateQu
 import "./QuizGame.scss";
 
 export const QuizGameComponent = () => {
-  const { address } = useAccount();
+  const { address, chain } = useAccount();
   const { connectors } = useConnect();
 
   const [connector, setConnector] = useState<Connector>();
@@ -35,22 +35,28 @@ export const QuizGameComponent = () => {
   });
 
   useEffect(() => {
-    if (address) {
+    if (address && chain?.name === "Sepolia") {
+      setConnector(
+        connectors.filter((connector) => connector.id === "io.metamask")[0]
+      );
+
       fetchAllQuizzes();
     }
-
-    setConnector(
-      connectors.filter((connector) => connector.id === "io.metamask")[0]
-    );
-  }, [address]);
+  }, [address, chain, connectors]);
 
   const fetchAllQuizzes = async () => {
     try {
+      setIsLoading(true);
       const result = (await readContract(config, {
         abi: QUIZ_GAME_FACTORY_ABI,
         address: import.meta.env.FACTORY_CONTRACT_ADDRESS,
         functionName: "getQuizGames",
+        chainId: chain?.id,
       })) as ContractAddress[];
+
+      if (!result || result.length === 0) {
+        throw new Error("No quiz games found.");
+      }
 
       const fetchedQuizzes: QuizBasicInfo[] = [];
 
@@ -65,9 +71,10 @@ export const QuizGameComponent = () => {
       }
 
       setQuizzes(fetchedQuizzes);
-      setIsLoading(false);
     } catch (error) {
       console.error("Error reading contract:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -77,6 +84,7 @@ export const QuizGameComponent = () => {
         abi: QUIZ_GAME_ABI,
         address: singleAddress,
         functionName: "question",
+        chainId: chain?.id,
       });
 
       return result;
@@ -88,6 +96,12 @@ export const QuizGameComponent = () => {
       setIsLoading(false);
     }
   };
+
+  if (chain?.name !== "Sepolia") {
+    return (
+      <div className="sepolia-error">Please change the network to Sepolia!</div>
+    );
+  }
 
   return (
     <div className="quiz-game-container">
@@ -121,7 +135,7 @@ export const QuizGameComponent = () => {
                   }}
                   sx={{ width: "20rem" }}
                 >
-                  Start the "{quiz.question}" Quizz
+                  Start the "{quiz.question}" Quiz
                 </Button>
               ))
             ) : (

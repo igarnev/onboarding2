@@ -37,7 +37,6 @@ export const CreateQuizQuestion = ({
   const createQuizQuestion = async () => {
     try {
       handleCreateQuiz();
-      handleQuizCreationListening();
     } catch (error: any) {
       setModalProps({
         headerText: "An error has occurred",
@@ -46,17 +45,28 @@ export const CreateQuizQuestion = ({
     }
   };
 
-  const handleCreateQuiz = () => {
-    writeContract(config, {
-      abi: QUIZ_GAME_FACTORY_ABI,
-      address: import.meta.env.FACTORY_CONTRACT_ADDRESS,
-      functionName: "createQuizGame",
-      args: [question, questionAnswer, questionSalt],
-      value: BigInt(6),
-      connector,
-      account: address,
-    });
+  const handleCreateQuiz = async () => {
     setIsLoading(true);
+
+    try {
+      await writeContract(config, {
+        abi: QUIZ_GAME_FACTORY_ABI,
+        address: import.meta.env.FACTORY_CONTRACT_ADDRESS,
+        functionName: "createQuizGame",
+        args: [question, questionAnswer, questionSalt],
+        value: BigInt(6),
+        connector,
+        account: address,
+      });
+      handleQuizCreationListening();
+    } catch (error: any) {
+      setIsLoading(false);
+      clearCreateQuizForm();
+      setModalProps({
+        headerText: "An error has occurred",
+        contentText: error.message,
+      });
+    }
   };
 
   const handleQuizCreationListening = () =>
@@ -67,6 +77,7 @@ export const CreateQuizQuestion = ({
       onLogs() {
         fetchAllQuizzes();
         clearCreateQuizForm();
+        setIsLoading(false);
       },
     });
 
@@ -108,7 +119,12 @@ export const CreateQuizQuestion = ({
           sx={{ width: "15rem" }}
         />
 
-        <Button type="submit" variant="contained" sx={{ width: "10rem" }}>
+        <Button
+          type="submit"
+          variant="contained"
+          sx={{ width: "10rem" }}
+          disabled={!question || !questionAnswer || !questionSalt}
+        >
           Enter
         </Button>
       </form>
